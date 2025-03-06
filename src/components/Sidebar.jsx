@@ -14,6 +14,10 @@ import {
   Inventory,
   Menu,
   ChevronLeft,
+  AssignmentTurnedIn,
+  ReceiptLong,
+  BarChart,
+  HelpOutline,
 } from "@mui/icons-material";
 import { Link, useLocation } from "react-router-dom";
 
@@ -23,6 +27,10 @@ const Sidebar = ({ open, toggleDrawer }) => {
     { text: "TRANG CHỦ", icon: <Home />, path: "/" },
     { text: "SẢN PHẨM", icon: <Inventory />, path: "/products" },
     { text: "ĐĂNG BÁN", icon: <ShoppingCart />, path: "/sells" },
+    { text: "DUYỆT ĐƠN", icon: <AssignmentTurnedIn />, path: "/orders" },
+    { text: "ĐƠN HÀNG", icon: <ReceiptLong />, path: "/cart" },
+    { text: "THỐNG KÊ", icon: <BarChart />, path: "/statistics" },
+    { text: "HỖ TRỢ", icon: <HelpOutline />, path: "/support" },
   ];
 
   return (

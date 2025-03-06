@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useContext } from "react";
 import {
   Button,
   Table,
@@ -15,28 +15,29 @@ import {
   DialogActions,
   TextField,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
+  LinearProgress,
+  CircularProgress,
+  Typography,
+  Snackbar,
+  Alert,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import { Add, Edit, Delete } from "@mui/icons-material";
-import {
-  readItems,
-  addItem,
-  updateItem,
-  deleteItem,
-} from "../api/firebaseService";
+import { addItem, updateItem, deleteItem } from "../api/firebaseService";
 import { AppContext } from "../context/AppContext";
 import { uploadFileToImgBB } from "../Upload";
 
 const ProductsTable = () => {
-  const { setProducts, filteredProducts } = useContext(AppContext);
+  const { setProducts, filteredProducts, user } = useContext(AppContext);
+  const [successSnackbar, setSuccessSnackbar] = useState(false);
+  const [deleteSnackbar, setDeleteSnackbar] = useState(false);
   const [open, setOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const theme = useTheme();
+  const [loading, setLoading] = useState(false);
   const categories = ["Điện tử", "Thời trang", "Gia dụng", "Sách", "Khác"];
+
   const [currentProduct, setCurrentProduct] = useState({
     name: "",
     description: "",
@@ -46,12 +47,14 @@ const ProductsTable = () => {
     image: "",
     url: "",
     rating: 4.8,
-    userId: "",
+    userId: user?.userId || "admin",
     reviews: 120,
     createdAt: new Date().toISOString(),
     status: "Chờ duyệt",
   });
-
+  const searchMessage = filteredProducts.length
+    ? `Có ${filteredProducts.length} sản phẩm.`
+    : "Không có sản phẩm nào được tìm thấy.";
   const handleUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -62,14 +65,6 @@ const ProductsTable = () => {
     }); // Hiển thị ảnh tạm trước khi upload
   };
 
-  useEffect(() => {
-    readItems((data) => {
-      setProducts(
-        Object.entries(data || {}).map(([id, val]) => ({ id, ...val }))
-      );
-    }, "products");
-  }, []);
-
   const handleOpen = (product = null) => {
     setCurrentProduct(
       product || {
@@ -78,10 +73,10 @@ const ProductsTable = () => {
         price: 0,
         stock: 50,
         category: "",
-        image: currentProduct.image,
+        image: "",
         url: "",
         rating: 4.8,
-        userId: "",
+        userId: user?.userId || "admin",
         reviews: 120,
         createdAt: new Date().toISOString(),
         status: "Chờ duyệt",
@@ -94,32 +89,50 @@ const ProductsTable = () => {
     setOpen(false);
   };
 
-  const handleSave = async () => {
+  const onSave = async () => {
+    setLoading(true);
     try {
-      if (currentProduct.id) {
-        await updateItem(currentProduct.id, currentProduct, "products");
+      if (currentProduct.productId) {
+        await updateItem(currentProduct.productId, currentProduct, "products");
         setProducts((prev) =>
-          prev.map((p) => (p.id === currentProduct.id ? currentProduct : p))
+          prev.map((p) =>
+            p.productId === currentProduct.productId ? currentProduct : p
+          )
         );
+        setSuccessSnackbar(true);
       } else {
         const newId = Date.now().toString();
-        await addItem(newId, { ...currentProduct, id: newId }, "products");
-        setProducts((prev) => [...prev, { ...currentProduct, id: newId }]);
+        await addItem(
+          newId,
+          { ...currentProduct, productId: newId },
+          "products"
+        );
+        setProducts((prev) => [
+          ...prev,
+          { ...currentProduct, productId: newId },
+        ]);
+        setSuccessSnackbar(true);
       }
 
       setOpen(false);
     } catch (error) {
       console.error("Lỗi thao tác sản phẩm:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteConfirm = async () => {
+    setLoading(true);
     try {
       await deleteItem(selectedId, "products");
-      setProducts((prev) => prev.filter((p) => p.id !== selectedId));
+      setProducts((prev) => prev.filter((p) => p.productId !== selectedId));
       setDeleteDialog(false);
+      setDeleteSnackbar(true);
     } catch (error) {
       console.error("Lỗi xóa sản phẩm:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -146,8 +159,8 @@ const ProductsTable = () => {
           </TableHead>
           <TableBody>
             {filteredProducts.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell>{product.id}</TableCell>
+              <TableRow key={product.productId}>
+                <TableCell>{product.productId}</TableCell>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.category}</TableCell>
                 <TableCell>{product.price} VNĐ</TableCell>
@@ -162,7 +175,7 @@ const ProductsTable = () => {
                   <IconButton
                     color="error"
                     onClick={() => {
-                      setSelectedId(product.id);
+                      setSelectedId(product.productId);
                       setDeleteDialog(true);
                     }}
                   >
@@ -174,72 +187,75 @@ const ProductsTable = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      {searchMessage && (
+        <Typography sx={{ mt: 2, color: "gray" }}>{searchMessage}</Typography>
+      )}
       {/* Modal Thêm/Sửa */}
-      <Dialog open={open} onClose={handleClose}>
+      <Dialog open={open} onClose={!loading ? handleClose : undefined}>
         <DialogTitle>
           {currentProduct.id ? "Sửa Sản Phẩm" : "Thêm Sản Phẩm"}
         </DialogTitle>
         <DialogContent>
+          {loading && <LinearProgress sx={{ mb: 2 }} />}{" "}
+          {/* Hiển thị tiến trình */}
           <TextField
             fullWidth
             label="Tên sản phẩm"
             margin="dense"
-            value={currentProduct.name}
+            value={currentProduct.name || ""}
             onChange={(e) =>
               setCurrentProduct({ ...currentProduct, name: e.target.value })
             }
+            disabled={loading}
           />
           <TextField
             fullWidth
             label="Mô tả"
             margin="dense"
-            value={currentProduct.description}
+            value={currentProduct.description || ""}
             onChange={(e) =>
               setCurrentProduct({
                 ...currentProduct,
                 description: e.target.value,
               })
             }
+            disabled={loading}
           />
           <TextField
             fullWidth
             label="Giá"
             margin="dense"
             type="number"
-            value={currentProduct.price}
+            value={currentProduct.price || ""}
             onChange={(e) =>
               setCurrentProduct({
                 ...currentProduct,
                 price: Number(e.target.value),
               })
             }
+            disabled={loading}
           />
           <TextField
             fullWidth
             label="Số lượng tồn kho"
             margin="dense"
             type="number"
-            value={currentProduct.stock}
+            value={currentProduct.stock || ""}
             onChange={(e) =>
               setCurrentProduct({
                 ...currentProduct,
                 stock: Number(e.target.value),
               })
             }
+            disabled={loading}
           />
-
           {/* Chọn phân loại sản phẩm */}
-          <FormControl fullWidth margin="dense" sx={{ mt: 2, mb: 1 }}>
-            <InputLabel
-              variant="outlined"
-              sx={{
-                background: theme.palette.background.paper,
-                px: 0.5,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Phân loại
-            </InputLabel>
+          <FormControl
+            fullWidth
+            margin="dense"
+            sx={{ mt: 2, mb: 1 }}
+            disabled={loading}
+          >
             <Select
               value={currentProduct.category || ""}
               onChange={(e) =>
@@ -249,28 +265,6 @@ const ProductsTable = () => {
                 })
               }
               displayEmpty
-              sx={{
-                borderRadius: 2,
-                backgroundColor: theme.palette.background.paper,
-                color: theme.palette.text.primary,
-                "&:hover": {
-                  backgroundColor: theme.palette.action.hover,
-                },
-                "&.Mui-focused": {
-                  borderColor: theme.palette.primary.main,
-                },
-              }}
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    maxHeight: 200,
-                    overflowY: "auto",
-                    boxShadow: 3,
-                    borderRadius: 2,
-                    backgroundColor: theme.palette.background.paper,
-                  },
-                },
-              }}
             >
               <MenuItem disabled value="">
                 Chọn phân loại sản phẩm
@@ -282,9 +276,13 @@ const ProductsTable = () => {
               ))}
             </Select>
           </FormControl>
-
           {/* Upload Ảnh */}
-          <input type="file" accept="image/*" onChange={handleUpload} />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleUpload}
+            disabled={loading}
+          />
           {currentProduct.image && (
             <img
               src={currentProduct.image}
@@ -294,13 +292,15 @@ const ProductsTable = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Hủy</Button>
-          <Button onClick={handleSave} variant="contained">
-            Lưu
+          <Button onClick={handleClose} disabled={loading}>
+            Hủy
+          </Button>
+          <Button onClick={onSave} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : "Lưu"}
           </Button>
         </DialogActions>
       </Dialog>
-      ;{/* Dialog Xóa */}
+      {/* Dialog Xóa */}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
         <DialogTitle>Xác nhận xóa sản phẩm?</DialogTitle>
         <DialogActions>
@@ -310,10 +310,39 @@ const ProductsTable = () => {
             variant="contained"
             color="error"
           >
-            Xóa
+            {loading ? <CircularProgress size={24} color="inherit" /> : "Xóa"}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={successSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setSuccessSnackbar(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setSuccessSnackbar(false)}
+          severity="success"
+          sx={{ width: "100%" }}
+        >
+          Lưu sản phẩm thành công!
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={deleteSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setDeleteSnackbar(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setDeleteSnackbar(false)}
+          severity="error"
+          sx={{ width: "100%" }}
+        >
+          Xóa sản phẩm thành công!
+        </Alert>
+      </Snackbar>
     </>
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useContext, useState } from "react";
+import { useContext, useState } from "react";
 import {
   Grid,
   Card,
@@ -12,24 +12,26 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
-import { AddShoppingCart, Visibility } from "@mui/icons-material";
+import { AddShoppingCart } from "@mui/icons-material";
 import AuthModal from "../models/AuthModal";
-import { readItems } from "../api/firebaseService";
+import UserInfoModal from "../models/UserInfoModal";
+import { addItem } from "../api/firebaseService";
 import { AppContext } from "../context/AppContext";
 
 const ProductsGrid = () => {
-  const { filteredProducts, setProducts, loggedIn, setLoggedIn } =
+  const { filteredProducts, loggedIn, setLoggedIn, user, setCart } =
     useContext(AppContext);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [open, setOpen] = useState(false);
   const [openAuthModal, setOpenAuthModal] = useState(false);
-  useEffect(() => {
-    readItems((data) => {
-      setProducts(
-        Object.entries(data || {}).map(([id, val]) => ({ id, ...val }))
-      );
-    }, "products");
-  }, []);
+  const [buy, setBuy] = useState(false);
+  const [cartIds, setCartIds] = useState(null);
+  const [showFullContent, setShowFullContent] = useState(false);
+  const [openUserInfoModal, setOpenUserInfoModal] = useState(false);
+
+  const toggleContent = () => {
+    setShowFullContent((prev) => !prev);
+  };
 
   // Mở modal thông tin sản phẩm
   const handleOpenModal = (product) => {
@@ -37,6 +39,31 @@ const ProductsGrid = () => {
     setOpen(true);
   };
 
+  const handleAddToCart = async (product) => {
+    setOpenUserInfoModal(true);
+    setSelectedProduct(product); // Đúng cú pháp set state
+    setBuy(true);
+
+    try {
+      const newId = Date.now().toString();
+      const cartProduct = {
+        cartId: newId,
+        productId: product.productId,
+        stock: 1,
+        totalPrice: product.price * 1,
+        userId: user?.userId || "admin",
+        createdAt: new Date().toISOString(),
+        status: "Chờ duyệt",
+      };
+
+      await addItem(newId, cartProduct, "carts");
+      setCart((prev) => [...prev, cartProduct]);
+      setCartIds(newId);
+      setSuccessSnackbar(true);
+    } catch (error) {
+      console.error("Lỗi khi thêm vào giỏ hàng:", error);
+    }
+  };
   // Đóng modal
   const handleCloseModal = () => {
     setOpen(false);
@@ -85,7 +112,7 @@ const ProductsGrid = () => {
                   fullWidth
                   onClick={() => {
                     if (loggedIn) {
-                      alert("Mua thành công");
+                      handleAddToCart(product);
                     } else {
                       setOpenAuthModal(true);
                     }
@@ -99,22 +126,20 @@ const ProductsGrid = () => {
                   Mua ngay
                 </Button>
 
+                {/* Modal thông tin user */}
+                <UserInfoModal
+                  open={openUserInfoModal}
+                  handleClose={() => setOpenUserInfoModal(false)}
+                  buy={buy}
+                  cartId={cartIds}
+                  productPrice={selectedProduct?.price}
+                />
                 {/* Modal đăng nhập */}
                 <AuthModal
                   open={openAuthModal}
                   setOpen={setOpenAuthModal}
                   setLoggedIn={setLoggedIn}
                 />
-                <Button
-                  size="small"
-                  color="secondary"
-                  variant="outlined"
-                  fullWidth
-                  onClick={() => handleOpenModal(product)}
-                  startIcon={<Visibility />}
-                >
-                  Chi tiết
-                </Button>
               </CardActions>
             </Card>
           </Grid>
@@ -140,28 +165,45 @@ const ProductsGrid = () => {
                 Giá: {selectedProduct.price} VNĐ
               </Typography>
               <Typography variant="body1" sx={{ mt: 1 }}>
-                {selectedProduct.description || "Không có mô tả chi tiết"}
+                {selectedProduct.description ? (
+                  <>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        display: "block",
+                        wordBreak: "break-word",
+                        whiteSpace: "pre-line",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {showFullContent
+                        ? selectedProduct.description
+                        : `${selectedProduct.description.slice(0, 150)}...`}
+                    </Typography>
+
+                    {selectedProduct.description.length > 150 && (
+                      <Button
+                        size="small"
+                        onClick={toggleContent}
+                        sx={{
+                          mt: 1,
+                          textTransform: "none",
+                          fontSize: "0.875rem",
+                          color: "primary.main",
+                        }}
+                      >
+                        {showFullContent ? "Ẩn bớt" : "Xem thêm"}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Không có mô tả chi tiết
+                  </Typography>
+                )}
               </Typography>
             </DialogContent>
-            <DialogActions>
-              <Button
-                size="small"
-                color="primary"
-                variant="contained"
-                fullWidth
-                onClick={() => handleAddToCart(product)}
-                startIcon={<AddShoppingCart />}
-                sx={{
-                  transition: "0.2s",
-                  "&:hover": { backgroundColor: "#1976d2" },
-                }}
-              >
-                Giỏ hàng
-              </Button>
-              <Button onClick={handleCloseModal} color="error">
-                Đóng
-              </Button>
-            </DialogActions>
+            <DialogActions></DialogActions>
           </>
         )}
       </Dialog>

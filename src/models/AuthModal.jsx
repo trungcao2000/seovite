@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   Modal,
   Box,
@@ -8,9 +8,11 @@ import {
   Tab,
   Typography,
 } from "@mui/material";
-import { registerUser, loginUser } from "../api/firebaseService";
+import { registerUser, loginUser, getUser } from "../api/firebaseService";
+import { AppContext } from "../context/AppContext";
 
 const AuthModal = ({ open, setOpen, setLoggedIn }) => {
+  const { setUser } = useContext(AppContext);
   const [tabIndex, setTabIndex] = useState(0);
   const [formData, setFormData] = useState({
     name: "",
@@ -40,6 +42,7 @@ const AuthModal = ({ open, setOpen, setLoggedIn }) => {
         if (res.success) {
           alert("Đăng nhập thành công!");
           setLoggedIn(true);
+          getUser(formData.phone, setUser);
           handleClose();
         } else {
           alert(res.message);
@@ -50,10 +53,11 @@ const AuthModal = ({ open, setOpen, setLoggedIn }) => {
           formData.phone,
           formData.pass,
           formData.name,
-          formData.address // Không cần truyền ảnh, ảnh mặc định là ""
+          formData.address
         );
         alert(res.message);
         if (res.success) {
+          console.log("User ID:", res.userId); // Kiểm tra userId đã được tạo chưa
           setTabIndex(0); // Chuyển về tab đăng nhập sau khi đăng ký thành công
         }
       }

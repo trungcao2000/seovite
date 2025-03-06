@@ -7,13 +7,11 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  Badge,
   TextField,
   InputAdornment,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
-  ShoppingCart,
   Brightness4,
   Brightness7,
   Search as SearchIcon,
@@ -24,7 +22,7 @@ import { Outlet } from "react-router-dom";
 import { ThemeContext } from "../ThemeContext";
 import { AppContext } from "../context/AppContext";
 import AuthModal from "../models/AuthModal";
-
+import UserInfoModal from "../models/UserInfoModal";
 const DashboardLayout = () => {
   const { darkMode, toggleDarkMode } = useContext(ThemeContext);
   const { loggedIn, setLoggedIn, searchTerm, setSearchTerm } =
@@ -32,7 +30,7 @@ const DashboardLayout = () => {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [openAuthModal, setOpenAuthModal] = useState(false);
-  const [cartCount, setCartCount] = useState(3);
+  const [openUserInfoModal, setOpenUserInfoModal] = useState(false);
 
   const toggleDrawer = () => setOpen(!open);
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
@@ -113,13 +111,6 @@ const DashboardLayout = () => {
               {darkMode ? <Brightness7 /> : <Brightness4 />}
             </IconButton>
 
-            {/* Giỏ hàng */}
-            <IconButton color="inherit">
-              <Badge badgeContent={cartCount} color="error">
-                <ShoppingCart />
-              </Badge>
-            </IconButton>
-
             {/* Avatar User */}
             <IconButton color="inherit" onClick={handleMenuOpen}>
               <Avatar src="https://via.placeholder.com/40" />
@@ -131,7 +122,9 @@ const DashboardLayout = () => {
             >
               {loggedIn ? (
                 <>
-                  <MenuItem onClick={handleMenuClose}>Thông tin</MenuItem>
+                  <MenuItem onClick={() => setOpenUserInfoModal(true)}>
+                    Thông tin
+                  </MenuItem>
                   <MenuItem onClick={handleLogout}>Đăng xuất</MenuItem>
                 </>
               ) : (
@@ -139,11 +132,16 @@ const DashboardLayout = () => {
                   Đăng nhập
                 </MenuItem>
               )}
-
+              {/* Modal login */}
               <AuthModal
                 open={openAuthModal}
                 setOpen={setOpenAuthModal}
                 setLoggedIn={setLoggedIn}
+              />
+              {/* Modal thông tin user */}
+              <UserInfoModal
+                open={openUserInfoModal}
+                handleClose={() => setOpenUserInfoModal(false)}
               />
             </Menu>
           </Box>
